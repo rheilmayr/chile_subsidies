@@ -1,6 +1,6 @@
 clear
 clear matrix
-loc dir D:\cloud\dropbox\documents\research\chile\landUseModel\8-10-19\
+loc dir D:\cloud\dropbox\documents\research\chile\landUseModel\1-15-20\
 insheet using `dir'estimation.csv
 set more off
 sum ag_ev plant_ev for_ev
@@ -28,7 +28,6 @@ foreach use in `uses'{
 		}
 	gen `use'dum_central = `use'dum*central
 	gen `use'dum_south = `use'dum*south
-	gen `use'dum_t2011 = `use'dum*t2011
 	forval luq=2/3 { 
 		gen `use'rent_luq`luq' = `use'rent*luq`luq'
 		gen `use'dum_luq`luq' = `use'dum*luq`luq'
@@ -56,31 +55,46 @@ loc vars plantrent_luq1 plantrent_luq2 plantrent_luq3 plantdum_luq1 plantdum_luq
 	agrent_luq1 agrent_luq2 agrent_luq3 agdum_luq1 agdum_luq2 agdum_luq3 ///
 	agdum_south agdum_central  ///
 	forrent_luq1 forrent_luq2 forrent_luq3 fordum_luq1 fordum_luq2 fordum_luq3 ///
-	fordum_south fordum_central 
-
+	fordum_south fordum_central
 loc olus 1 3 5 19
-
 loc reg_vars
 foreach olu in `olus'{
 	foreach variable in `vars'{
-   		gen olu`olu'_`variable' = olu`olu' * `variable'
+//    		gen olu`olu'_`variable' = olu`olu' * `variable'
 		loc reg_vars `reg_vars' olu`olu'_`variable'
 		}
 	}
-
-
+// eststo tp_2001: clogit luchoice `reg_vars' ///
+// 	if oos==0 & timeperiod==2001, group(yfid) cluster(comuna)		
+// esttab using `dir'results_2001.csv, se star(* 0.10 ** 0.05 *** 0.01) replace
+// matrix cov = e(V)
+// matrix coefs = e(b)
+// mat2txt, matrix(cov) saving(`dir'cov_2001) replace
+// mat2txt, matrix(coefs) saving(`dir'coefs_2001) replace
+// eststo clear
+//
+// eststo tp_2011: clogit luchoice `reg_vars' ///
+// 	if oos==0 & timeperiod==2011, group(yfid) cluster(comuna)		
+// esttab using `dir'results_2011.csv, se star(* 0.10 ** 0.05 *** 0.01) replace
+// matrix cov = e(V)
+// matrix coefs = e(b)
+// mat2txt, matrix(cov) saving(`dir'cov_2011) replace
+// mat2txt, matrix(coefs) saving(`dir'coefs_2011) replace
+// eststo clear
+	
 eststo pooled: clogit luchoice `reg_vars' ///
-	if pooled_sample==1 & oos==0, group(yfid) cluster(comuna)		
+	if pooled_sample==1 & oos==0, group(yfid) cluster(comuna)	
 esttab using `dir'results_pool.csv, se star(* 0.10 ** 0.05 *** 0.01) replace
+count if e(sample) & luchoice
 
 matrix cov = e(V)
 matrix coefs = e(b)
 mat2txt, matrix(cov) saving(`dir'cov) replace
 mat2txt, matrix(coefs) saving(`dir'coefs) replace
-	
 eststo clear
+
 eststo prop_sample: clogit luchoice `reg_vars' ///
-	if pooled_sample==1 & oos==0 & prop_keep==1, group(yfid) cluster(comuna)		
-	
+	if pooled_sample==1 & oos==0 & prop_keep==1, group(yfid) cluster(comuna)			
 esttab using `dir'results_propsample.csv, se star(* 0.10 ** 0.05 *** 0.01) replace	
+count if e(sample) & luchoice
 

@@ -12,12 +12,14 @@ import pandas as pd
 import numpy as np
 import statsmodels.stats.api as sms
 from sklearn import metrics
+import random
+random.seed(123)
 
 # =============================================================================
 # Set parameters
 # =============================================================================
-data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/8-10-19/'
 n = 1000
+data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/1-15-20/'
 out_dir = data_dir + 'sim/'
 results_dir = data_dir + 'results/'
 
@@ -29,6 +31,12 @@ data_df = pd.read_csv(data_csv, index_col = 0)
 coefs_csv = data_dir + 'coefs.txt' # Created by stata estimation.do
 cov_csv = data_dir + 'cov.txt' # Created by stata estimation.do
 
+coefs_dict = {'p2001': data_dir + 'coefs_2001.txt',
+              'p2011': data_dir + 'coefs_2011.txt',
+              'pooled': data_dir + 'coefs.txt'}
+cov_dict = {'p2001': data_dir + 'cov_2001.txt',
+            'p2011': data_dir + 'cov_2011.txt',
+            'pooled': data_dir + 'cov.txt'}
 # =============================================================================
 # Define functions
 # =============================================================================
@@ -165,13 +173,12 @@ class Simulator:
         self.cov_df = cov_df.set_index('Unnamed: 0').iloc[:, :-1]
 
     def draw_coefs(self, n):
-        if n == 1:
-            self.n = n
+        self.n = n
+        if self.n == 1:
             coefs_draw = self.coefs_df.T
             self.coefs_draw = coefs_draw.rename(index = lambda x: x.replace('luchoice:', '')) 
             
         else:
-            self.n = n
             coefs_draw = np.random.multivariate_normal(self.coefs_df.values[0], 
                         self.cov_df.values, size = n).T
             coefs_draw = pd.DataFrame(coefs_draw, index = self.coefs_df.columns)
@@ -277,22 +284,26 @@ class Simulator:
 simulator = Simulator()
 simulator.load_coefs(coefs_csv, cov_csv)
 simulator.draw_coefs(n)
-import time
-t0 = time.time()
 sim_dict = simulator.sim(data_df)
-t1 = time.time()
-t1 - t0
-    
 sim_dict['sub'].to_csv(out_dir + 'sim_sub.csv', header = True)
 sim_dict['ns'].to_csv(out_dir + 'sim_ns.csv', header = True)
-sim_dict['rs'].to_csv(out_dir + 'sim_rs.csv', header = True)
+sim_dict['rs'].to_csv(out_dir + 'sim_rs.csv', header = True)     
 
-#sim_sub = pd.read_csv(out_dir + 'sim_sub.csv', index_col = 0)
-#sim_ns = pd.read_csv(out_dir + 'sim_ns.csv', index_col = 0)
-#sim_rs = pd.read_csv(out_dir + 'sim_rs.csv', index_col = 0)
-#sim_dict = {'sub': sim_sub,
-#            'ns': sim_ns,
-#            'rs': sim_rs}
+
+sim_sub = pd.read_csv(out_dir + 'sim_sub.csv', index_col = 0)
+sim_ns = pd.read_csv(out_dir + 'sim_ns.csv', index_col = 0)
+sim_rs = pd.read_csv(out_dir + 'sim_rs.csv', index_col = 0)
+sim_dict = {'sub': sim_sub,
+            'ns': sim_ns,
+            'rs': sim_rs}
+
+# =============================================================================
+# Run single simulation for figure 1
+# =============================================================================
+plant_prob = (sim_sub==3).mean(axis = 1)
+plant_prob.name = 'sub_sim'
+fig_df = data_df.merge(plant_prob, left_index = True, right_index = True, how = 'left')
+fig_df.to_csv(out_dir + 'fig_data.csv')
 
 # =============================================================================
 # Transition table (Table 2)
@@ -331,22 +342,24 @@ for row in rows:
     for column in columns:
         ci = transition_df.loc[row, (column, 'ci')]
         mean = transition_df.loc[row, (column, 'mean')]
-        ci = '%s' % float('%.4g' % ci)
-        mean = '%s' % float('%.4g' % mean)
+#        ci = '%s' % float('%.2g' % ci) 
+#        mean = '%s' % float('%.2g' % mean)
+        ci = '{0:,.2f}'.format(ci)
+        mean = '{0:,.2f}'.format(mean)
         string = str(mean) + ' +/- ' + str(ci)
         t2_df.loc[row, column] = string
 
-lu_labels = {1: 'Forest', 3: 'Plantation', 5: 'Shrub', 19: 'Agriculture', 'bio': 'Biodiversity', 
+lu_labels = {1: 'Native forest', 3: 'Plantation', 5: 'Shrub', 19: 'Agriculture', 'bio': 'Biodiversity', 
              'co2': '\makecell{Carbon \\\ sequestration}'} 
-column_labels = {'sub': '\makecell{Subsidy \\\ (S1)}', 
-                 'ns': '\makecell{No subsidy  \\\ (S2)}', 
-                 'rs': '\makecell{Restricted subsidy \\\ (S3)}', 
+column_labels = {'sub': '\makecell{D.L. 701 \\\ baseline \\\ (S1)}', 
+                 'ns': '\makecell{No subsidy \\\ counterfactual \\\ (S2)}', 
+                 'rs': '\makecell{Perfect enforcement \\\ counterfactual \\\ (S3)}', 
                  'sub-ns': '\makecell{Impact of subsidy \\\ (S1 - S2)}', 
-                 'rs-ns': '\makecell{Impact of restricted subsidy \\\ (S3 - S2)}', 
+                 'rs-ns': '\makecell{Impact of perfectly \\\ enforced subsidy \\\ (S3 - S2)}', 
                  'lu_86': "Starting state (1986)",
-                 'sub-lu_86': '\makecell{Subsidy \\\ (S1)}',
-                 'ns-lu_86': '\makecell{No subsidy \\\ (S2)}',
-                 'rs-lu_86': '\makecell{Restricted subsidy \\\ (S3)}'}
+                 'sub-lu_86': '\makecell{D.L. 701 \\\ baseline \\\ (S1)}',
+                 'ns-lu_86': '\makecell{No subsidy \\\ counterfactual \\\ (S2)}',
+                 'rs-lu_86': '\makecell{Perfect enforcement \\\ counterfactual \\\ (S3)}'}
 
 
 t2_df = t2_df[['sub', 'ns', 'rs', 'sub-ns', 'rs-ns']]
@@ -386,6 +399,7 @@ areas_dict = {key: df.apply(pd.value_counts) * area_wght for key, df in sim_dict
 
 comparisons = [('rs', 'ns'),
                ('sub', 'ns'),
+               ('rs', 'sub'),
                ('rs', 'lu_86'),
                ('sub', 'lu_86'),
                ('ns', 'lu_86'),
@@ -400,17 +414,20 @@ areas_df = pd.concat(areas_stats, axis = 1).sort_index()
 # =============================================================================
 # Biodiversity impacts
 # =============================================================================
-bio_csv ='D:/cloud/dropbox/documents/research/chile/landUseModel/results/bio_results.csv'
 class estimate_bio:
     def __init__(self, bio_csv, n):
-        esize_df = pd.read_csv(bio_csv)
-        esize_df = esize_df.loc[esize_df['lu_to'].isin([3, 5])].set_index('lu_to')
-        self.effect_sizes = np.random.normal(esize_df['mean'], esize_df['sd'], (n, 2))
+        esize_df = pd.read_csv(bio_csv, index_col = 0).T
+        esize_df = esize_df.rename(index = {'pla': 3, 'mat': 5, 'ag': 19})
+        esize_df = esize_df.reset_index().rename(columns = {'index': 'lu_to'})
+        self.esize_df = esize_df.loc[esize_df['lu_to'].isin([3, 5, 19])].set_index('lu_to')
+        self.effect_sizes = np.random.normal(self.esize_df['mean'], self.esize_df['sd'], (n, 3))
         
     def column_calc(self, col):
-        col = col.loc[col.index.isin([1, 3, 5])]
+        col = col.loc[col.index.isin([1, 3, 5, 19])]
         proportions = col / col.sum()
-        bio_estimate = proportions.loc[3] * self.effect_sizes[col.name][0] + proportions.loc[5] * self.effect_sizes[col.name][1]
+        bio_estimate = proportions.loc[3] * self.effect_sizes[col.name][0] + \
+            proportions.loc[5] * self.effect_sizes[col.name][1] + \
+            proportions.loc[19] * self.effect_sizes[col.name][2]
         return bio_estimate
 
     def __call__(self, sim_df):
@@ -419,8 +436,9 @@ class estimate_bio:
         bio_df = areas.apply(self.column_calc)
         return bio_df
 
-estimator = estimate_bio(bio_csv, n)
-bio_dict = {key: estimator(sim_df).dropna() for key, sim_df in sim_dict.items()}
+bio_csv = results_dir + 'bio_results.csv'
+bio_estimator = estimate_bio(bio_csv, n)
+bio_dict = {key: bio_estimator(sim_df).dropna() for key, sim_df in sim_dict.items()}
 
 for a, b in comparisons:
     bio_dict[(a + '-' + b)] = bio_dict[(a)] - bio_dict[(b)]
@@ -442,7 +460,7 @@ class estimate_co2:
         co2_df.columns.name = 'lu_to'
         co2_df = co2_df.sort_index(axis = 1)
         co2_df = co2_df.sort_index(axis = 0)
-        lu_dict = {1: 'Natural forests', 3: 'Plantations', 5: 'Shrub', 
+        lu_dict = {1: 'Native forest', 3: 'Plantation', 5: 'Shrub', 
                    19: 'Agriculture'}
         co2_table = co2_df.rename(columns = lambda x: lu_dict[x])
         co2_table = co2_table.loc[[5,13,6,7,8,9,10,14]]
@@ -456,7 +474,8 @@ class estimate_co2:
         region_df = pd.DataFrame({i: groups[i].value_counts() for i in runs}) * area_wght
         region_df.index.names = ['region', 'lu_to']
         co2_sim = region_df.apply(lambda x: x.mul(self.co2_df).sum(), axis = 0)
-        co2_sim = co2_sim / 1000 # Convert to million tonnes C
+#        co2_sim = co2_sim / 1000 # Convert to million tonnes C
+#        keep as thousand tonnes C - GgC
         return co2_sim
 
 estimator = estimate_co2()
@@ -471,7 +490,7 @@ co2_df = pd.DataFrame(pd.concat(co2_stats, axis = 0)).T.rename(index = {0: 'co2'
 # =============================================================================
 # Combine area, biodiversity and co2 data into single table (Table 1)
 # =============================================================================
-results_df = pd.concat([areas_df, bio_df, co2_df])
+results_df = pd.concat([areas_df, co2_df, bio_df])
 
 rows = results_df.index
 columns = results_df.columns.get_level_values(0).unique()
@@ -483,12 +502,22 @@ for row in rows:
     for column in columns:
         ci = results_df.loc[row, (column, 'ci')]
         mean = results_df.loc[row, (column, 'mean')]
-        ci = '{:.3g}'.format(ci)
-        mean = '{: .4g}'.format(mean)
+        ci = '{0:,.2f}'.format(ci)
+        mean = '{0:,.2f}'.format(mean)
 #        ci = '%s' % float('%.4g' % ci)
 #        mean = '%s' % float('%.4g' % mean)
         string = str(mean) + ' +/- ' + str(ci)
         t1_df.loc[row, column] = string
+
+row = 'bio'
+for column in columns:
+    ci = results_df.loc[row, (column, 'ci')]
+    mean = results_df.loc[row, (column, 'mean')]
+    ci = '{:.3g}'.format(ci)
+    mean = '{:.3g}'.format(mean)
+    string = str(mean) + ' +/- ' + str(ci)
+    t1_df.loc[row, column] = string
+
 
 t1_df = t1_df[['sub-lu_86', 'ns-lu_86', 'rs-lu_86', 'sub-ns', 'rs-ns']]
 t1_df = t1_df.rename(index = lu_labels)
@@ -500,9 +529,9 @@ t1_df = t1_df.T.set_index('', append=True).T.swaplevel(1, 0, axis = 1)
 units = ['\makecell{Thousand \\\ hectares}', 
          '\makecell{Thousand \\\ hectares}',
          '\makecell{Thousand \\\ hectares}',
-         '\makecell{Thousand \\\ hectares}',
-         '\makecell{Area-weighted, standardized \\\ species richness}', 
-         'TgC']
+         '\makecell{Thousand \\\ hectares}', 
+         'Kilotonnes of carbon',
+         '\makecell{Area-weighted, standardized \\\ species richness}']
 t1_df['Units'] = units
 t1_df = t1_df.set_index('Units', append=True)
 t1_df.to_latex(buf = results_dir + 't1_summary.tex', multirow = True, 
@@ -605,7 +634,7 @@ def clean_regression(esttab_csv):
                 orderlist.append(use + 'dum_' + region + '_' + stat)
     
     reg_df = reg_df.loc[orderlist]
-    reg_df = reg_df.rename(columns = {'olu1': 'Forest', 'olu3': 'Plantation',
+    reg_df = reg_df.rename(columns = {'olu1': 'Native forest', 'olu3': 'Plantation',
                                       'olu5': 'Shrub', 'olu19': 'Agriculture'})
     return(reg_df)
 
@@ -716,7 +745,7 @@ results['E4_forest_chng'] = '{0:0.2f}%'.format(pct_change.loc[1])
 
 #Between 1986 and 2011, the carbon sequestered in aboveground vegetation increased by F1 Tg C 
 #(F2 percent)
-results['F1_newC_t'] = '{0:0.2f}'.format(change.loc['co2'])
+results['F1_newC_t'] = '{0:,.0f}'.format(change.loc['co2'])
 results['F2_newC_percent'] = '{0:0.2f}%'.format(pct_change.loc['co2'])
 
 #As a result, afforestation subsidies decreased total carbon sequestration in 
@@ -725,11 +754,22 @@ results['F2_newC_percent'] = '{0:0.2f}%'.format(pct_change.loc['co2'])
 #a G2 TgC increase in carbon sequestration. 
 dif = results_df.loc['co2', ('sub-ns', 'mean')] * -1
 ci = results_df.loc['co2', ('sub-ns', 'ci')]
-results['G1_sub_dif_C'] = '{0:0.3f} +/- {1:0.3f}'.format(dif, ci)
+results['G1_sub_dif_C'] = '{0:0.0f} +/- {1:0.0f}'.format(dif, ci)
 
 dif = results_df.loc['co2', ('rs-ns', 'mean')]
 ci = results_df.loc['co2', ('rs-ns', 'ci')]
-results['G2_rs_dif_C'] = '{0:0.3f} +/- {1:0.3f}'.format(dif, ci)
+results['G2_rs_dif_C'] = '{0:0.0f} +/- {1:0.0f}'.format(dif, ci)
+
+# Assuming a relatively modest social cost of carbon of $31 per ton of CO2, 
+# we estimate that perfect enforcement of restrictions on native forest 
+# conversion could have increased the carbon benefits of the subsidy 
+# from G3 dollars to G4 dollars.
+scc = 31 # dollars per ton CO2 as per nordhaus 2017
+scc = scc * 1000 / 3.67 # convert to dollars per kTC
+sub_scc = results_df.loc['co2', ('sub-ns', 'mean')] * scc / 1000000 # million usd
+results['G3_sub_scc'] = '{0:0.2f}'.format(-sub_scc)
+rs_scc = results_df.loc['co2', ('rs-ns', 'mean')] * scc / 1000000
+results['G4_rs_scc'] = '{0:0.2f}'.format(rs_scc)
 
 ### Results - Biodiversity
 #When aggregated through meta-analysis, previous ecological field studies show 
@@ -738,15 +778,14 @@ results['G2_rs_dif_C'] = '{0:0.3f} +/- {1:0.3f}'.format(dif, ci)
 #richness to paired shrublands (H2 std deviations). Given observed diversity distributions from plots 
 #of vascular plants, these differences indicate plantations have a mean species 
 #richness that is H3 percent lower than comparable native forests.
-bio_df = pd.read_csv(bio_csv, index_col = 'lu_to').sort_index()
-biostudy_df =  pd.read_csv('D:/cloud/dropbox/documents/research/chile/landUseModel/results/bio_studies.csv')
-mean = bio_df.loc[(3,5), 'mean']
-ci = bio_df.loc[(3,5), 'ci']
-ci = ci.apply(lambda row: eval(row)[0])
+bio_df = bio_estimator.esize_df
+biostudy_df = pd.read_csv('D:/cloud/dropbox/documents/research/chile/landUseModel/results/bio_studies.csv')
+mean = bio_df.loc[(3,5,19), 'mean']
+ci = bio_df.loc[(3,5,19), 'ci_lower']
 ci = mean-ci
 
 results['H1_biodif_plant'] = '{0:0.3f} +/- {1:0.3f}'.format(-mean[3], ci[3])
-results['H2_biodif_mat'] = '{0:0.3f} +/- {1:0.3f}'.format(mean[5], ci[5])
+#results['H2_biodif_mat'] = '{0:0.3f} +/- {1:0.3f}'.format(mean[5], ci[5])
 
 max_effect = mean-ci
 min_effect = mean+ci
@@ -781,109 +820,46 @@ results['H3_bioeffect'] = '{0:0.0f} to {1:0.0f}%'.format(min_mean_ratio, max_mea
 bio_11 = results_df.loc['bio', 'sub']
 results['I1_bio_11'] = '{0:0.3f} +/- {1:0.3f}'.format(bio_11['mean'], bio_11['ci'])
 results['I2_bio_11_smpl'] = '{0:0.3f}'.format(-bio_11['mean'])
-bio_ns = results_df.loc['bio', 'ns']
-results['I3_bio_ns'] = '{0:0.3f} +/- {1:0.3f}'.format(bio_ns['mean'], bio_ns['ci'])
+bio_change = results_df.loc['bio', 'sub-lu_86']
+results['I3_bio_sub_change'] = '{0:0.3f} +/- {1:0.3f}'.format(bio_change['mean'], bio_change['ci'])
+bio_ns_change = results_df.loc['bio', 'ns-lu_86']
+results['I4_bio_ns_change'] = '{0:0.3f} +/- {1:0.3f}'.format(bio_ns_change['mean'], bio_ns_change['ci'])
+
 bio_dif = results_df.loc['bio', 'sub-ns']
-results['I4_bio_dif'] = '{0:0.2g} +/- {1:0.2g}'.format(-bio_dif['mean'], bio_dif['ci'])
+results['I5_bio_dif'] = '{0:0.2g} +/- {1:0.2g}'.format(-bio_dif['mean'], bio_dif['ci'])
 
 
-biostudy_df['mean_ratio'] = (bio_dif['mean'] * biostudy_df['sd_b']) / biostudy_df['mean_b']
-mean_ratio = (biostudy_df.loc[biostudy_df['taxon']=='p', 'mean_ratio']).describe()['mean']
-#biostudy_df['min_mean_ratio'] = ((bio_dif['mean']+bio_dif['ci']) * biostudy_df['sd_b']) / biostudy_df['mean_b']
-#biostudy_df['max_species_change'] = biostudy_df['max_mean_ratio'] * biostudy_df['mean_b']
-#biostudy_df['min_species_change'] = biostudy_df['min_mean_ratio'] * biostudy_df['mean_b']
-#species_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'species_change']*-1).describe()
-#min_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'min_mean_ratio']).describe()['max']
-#max_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'max_mean_ratio']).describe()['min']
-#min_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'min_species_change']).describe()['max']
-#max_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'max_species_change']).describe()['min']
-results['I5_species_effect'] = '{0:0.2f}%'.format(mean_ratio * -100)
+#biostudy_df['mean_ratio'] = (bio_dif['mean'] * biostudy_df['sd_b']) / biostudy_df['mean_b']
+#mean_ratio = (biostudy_df.loc[biostudy_df['taxon']=='p', 'mean_ratio']).describe()['mean']
+##biostudy_df['min_mean_ratio'] = ((bio_dif['mean']+bio_dif['ci']) * biostudy_df['sd_b']) / biostudy_df['mean_b']
+##biostudy_df['max_species_change'] = biostudy_df['max_mean_ratio'] * biostudy_df['mean_b']
+##biostudy_df['min_species_change'] = biostudy_df['min_mean_ratio'] * biostudy_df['mean_b']
+##species_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'species_change']*-1).describe()
+##min_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'min_mean_ratio']).describe()['max']
+##max_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'max_mean_ratio']).describe()['min']
+##min_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'min_species_change']).describe()['max']
+##max_sp_change = (biostudy_df.loc[biostudy_df['taxon']=='p', 'max_species_change']).describe()['min']
+#results['I5_species_effect'] = '{0:0.2f}%'.format(mean_ratio * -100)
 
 bio_shr_impact = (results_df.loc['bio', 'sub-ns'] / results_df.loc['bio', 'sub-lu_86'])['mean'] * 100
 results['I6_species_effect_pct'] = '{0:0.2f}%'.format(bio_shr_impact)
 
 
-bio_rsdif = results_df.loc['bio', 'rs-ns']
-results['I7_bio_rsdif'] = '{0:0.2g} +/- {1:0.2g}'.format(-bio_rsdif['mean'], bio_rsdif['ci'])
-dif_shr = (bio_rsdif / bio_dif)['mean'] * 100
+bio_rsdif = results_df.loc['bio', 'rs-sub']
+results['I7_bio_rsdif'] = '{0:0.2g} +/- {1:0.2g}'.format(bio_rsdif['mean'], bio_rsdif['ci'])
+dif_shr = (-bio_rsdif / bio_dif)['mean'] * 100
 results['I8_bio_dif_shr'] = '{0:0.0f}%'.format(dif_shr)
 
 ## Conclusion
 # and increased carbon sequestration by J1 TgC
-dif = (results_df['rs-ns'] - results_df['sub-ns']).loc['co2', 'mean']
+dif = (results_df['rs-sub']).loc['co2', 'mean']
 results['J1_rs-sub-co2'] = '{0:0.2f}'.format(dif)
 
+# Filling in additional metric for land use section
+nf_change = results_df.loc[1, ('sub-lu_86', 'mean')] * -1
+results['C3_nf_change'] = '{0:0.0f}'.format(nf_change)
 
-##We estimate that the cost for each additional ton of sequestration was I1 $/tonne CO2 ...
-##This restricted subsidy increased aboveground carbon sequestration by 1.03 TgC at 
-##an estimated cost of I2 $/tonne CO2.
-#subsidy_csv = 'D:/cloud/dropbox/documents/research/chile/external_data/CONAF/conaf_sub_params.csv'
-#subsidy_df = pd.read_csv(subsidy_csv, index_col = 0)
-#subsidy_df = subsidy_df.rename(columns = lambda x: int(x))
-#transition_01_df = pd.read_csv(sim_dir + 'results_by_region_01.csv').set_index('region')
-#transition_11_df = pd.read_csv(sim_dir + 'results_by_region_11.csv').set_index('region')
-#plant_series = pd.DataFrame()
-#plant_series['1986'] = transition_01_df[transition_01_df['lu_to']==3]['1986'] * 1000
-#plant_series['2001'] = transition_01_df[transition_01_df['lu_to']==3]['86_sub'] * 1000
-#plant_series['2011'] = transition_11_df[transition_11_df['lu_to']==3]['01_sub'] * 1000
-#plant_series['01_dif'] = plant_series['2001'] - plant_series['1986']
-#plant_series['11_dif'] = plant_series['2011'] - plant_series['2001']
-#sub_2001 = subsidy_df.loc['1986-2000'] * plant_series['01_dif']
-#sub_2011 = subsidy_df.loc['2001-2011'] * plant_series['11_dif']
-#sub_value = (sub_2001 + sub_2011).sum()
-#sub_value = sub_value / 574.05 / 1000000. # Convert to million 2005 USD from 2005 CHP
-#c_price = sub_value / results['G1_sub_dif_C']
-#c_price = c_price * (12.01 / (12.01 + 32)) # Convert to tonnes CO2 from tonnes C
-#results['I1_carbonprice_sub'] = c_price
-#
-#plant_series = pd.DataFrame()
-#plant_series['1986'] = transition_01_df[transition_01_df['lu_to']==3]['1986'] * 1000
-#plant_series['2001'] = transition_01_df[transition_01_df['lu_to']==3]['86_rs'] * 1000
-#plant_series['2011'] = transition_11_df[transition_11_df['lu_to']==3]['01_rs'] * 1000
-#plant_series['01_dif'] = plant_series['2001'] - plant_series['1986']
-#plant_series['11_dif'] = plant_series['2011'] - plant_series['2001']
-#sub_2001 = subsidy_df.loc['1986-2000'] * plant_series['01_dif']
-#sub_2011 = subsidy_df.loc['2001-2011'] * plant_series['11_dif']
-#sub_value = (sub_2001 + sub_2011).sum()
-#sub_value = sub_value / 574.05 / 1000000. # Convert to million 2005 USD from 2005 CHP
-#c_price = sub_value / results['G2_rs_dif_C']
-#c_price = c_price * (12.01 / (12.01 + 32))
-#results['I2_carbonprice_rs'] = c_price
 
 ### Export results
 output_df = pd.Series(results)
 output_df.to_csv(results_dir + 'paper_results.csv', header = True)    
-
-
-# =============================================================================
-# Reviewer comments
-# =============================================================================
-# Comment 2.7
-model_error = (areas_df['sub-lu_86']['mean'] - areas_df['lu_11-lu_86']['mean']) / areas_df['lu_11-lu_86']['mean']
-
-
-mean_pas = 24.14
-mean_plant = 32.83
-sd_pas = 10.7
-sd_plant = 7.99
-n_pas = 39
-n_plant = 6
-t = (mean_pas - mean_plant) / (((sd_pas**2 / n_pas) + (sd_plant**2 / n_plant))**(1/2))
-
-from scipy.stats import t    
-def ttest(m1, m2, s1, s2, n1, n2, m0=0, equal_variance=False):
-    if equal_variance==False:
-        se = ( (s1**2/n1) + (s2**2/n2) ) ** (1/2)
-        # welch-satterthwaite df
-        df = ( (s1**2/n1 + s2**2/n2)**2 )/( (s1**2/n1)**2/(n1-1) + (s2**2/n2)**2/(n2-1) )
-    else:
-        # pooled standard deviation, scaled by the sample sizes
-        se = ( (1/n1 + 1/n2) * ((n1-1)*s1^2 + (n2-1)*s2^2)/(n1+n2-2) )**(1/2)
-        df = n1+n2-2
-    tstat = (m1-m2-m0)/se 
-    ci = t.interval(0.95, df = df, loc=m1-m2, scale=se)
-    return(m1-m2, se, tstat, df, ci)    
-dif, se, tstat, df, ci = ttest(mean_pas, mean_plant, sd_pas, sd_plant, n_pas, n_plant)
-
-
-ttest(mean_pas, mean_plant, sd_pas, sd_plant, n_pas, n_plant)
