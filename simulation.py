@@ -804,9 +804,12 @@ results['H1_biodif_plant'] = '{0:0.3f} +/- {1:0.3f}'.format(-mean[3], ci[3])
 max_effect = mean-ci
 min_effect = mean+ci
 
-biostudy_df = pd.read_csv(biostudy_csv)
-biostudy_df['max_mean_ratio'] = (max_effect[3] * biostudy_df['sd_b']) / biostudy_df['mean_b']
-biostudy_df['min_mean_ratio'] = (min_effect[3] * biostudy_df['sd_b']) / biostudy_df['mean_b']
+for_studies_means = pd.Series([24.5, 26.315, 30.1, 14.4156, 7.68, 46.36, 31.3, 16.2, 9.72])
+for_studies_sd = pd.Series([2.9, 5.42, 4.5, 4.857, 1.88, 11.084, 1.89, 1.46, 4.254])
+
+#biostudy_df = pd.read_csv(biostudy_csv)
+biostudy_df['max_mean_ratio'] = ((max_effect[3] * for_studies_sd) / for_studies_means)
+biostudy_df['min_mean_ratio'] = ((min_effect[3] * for_studies_sd) / for_studies_means)
 
 min_mean_ratio = (biostudy_df.loc[biostudy_df['taxon']=='p', 'min_mean_ratio']*-100).describe()['mean']
 max_mean_ratio = (biostudy_df.loc[biostudy_df['taxon']=='p', 'max_mean_ratio']*-100).describe()['mean']
