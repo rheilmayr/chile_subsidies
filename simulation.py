@@ -29,21 +29,27 @@ import os
 # Set parameters
 # =============================================================================
 n = 1000
-data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/paper_release_v3_confirm/'
+data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/paper_release_v6/'
 out_dir = data_dir + 'sim/'
 results_dir = data_dir + 'results/'
+
 
 # =============================================================================
 # Load files
 # =============================================================================
+# 1. Point observations
 data_csv = data_dir + 'simulation.csv'
 data_df = pd.read_csv(data_csv, index_col = 0)
-coefs_csv = data_dir + 'coefs.txt' # Created by stata estimation.do
-cov_csv = data_dir + 'cov.txt' # Created by stata estimation.do
 
+# 2. Summary of carbon density by region (tC/ha)
 co2_csv = data_dir + 'co2_metrics.csv'
+
+# 3. Results from biodiversity metanalysis
 bio_csv = data_dir + 'biodiversity_metrics.csv'
-biostudy_csv = 'D:/cloud/dropbox/documents/research/chile/landUseModel/results/bio_studies.csv'
+
+# 4. Results of econometric model (Created in stata using estimation.do)
+coefs_csv = data_dir + 'coefs.txt'
+cov_csv = data_dir + 'cov.txt' 
 
 
 # =============================================================================
