@@ -362,8 +362,6 @@ for row in rows:
     for column in columns:
         ci = transition_df.loc[row, (column, 'ci')]
         mean = transition_df.loc[row, (column, 'mean')]
-#        ci = '%s' % float('%.2g' % ci) 
-#        mean = '%s' % float('%.2g' % mean)
         ci = '{0:,.2f}'.format(ci)
         mean = '{0:,.2f}'.format(mean)
         string = str(mean) + ' +/- ' + str(ci)
@@ -799,20 +797,17 @@ ci = bio_df.loc[(3,5,19), 'ci_lower']
 ci = mean-ci
 
 results['H1_biodif_plant'] = '{0:0.3f} +/- {1:0.3f}'.format(-mean[3], ci[3])
-#results['H2_biodif_mat'] = '{0:0.3f} +/- {1:0.3f}'.format(mean[5], ci[5])
 
 max_effect = mean-ci
 min_effect = mean+ci
 
+# Input mean and sd species richness for forest plots from phytosociological studies of vascular plants
 for_studies_means = pd.Series([24.5, 26.315, 30.1, 14.4156, 7.68, 46.36, 31.3, 16.2, 9.72])
 for_studies_sd = pd.Series([2.9, 5.42, 4.5, 4.857, 1.88, 11.084, 1.89, 1.46, 4.254])
 
-#biostudy_df = pd.read_csv(biostudy_csv)
-biostudy_df['max_mean_ratio'] = ((max_effect[3] * for_studies_sd) / for_studies_means)
-biostudy_df['min_mean_ratio'] = ((min_effect[3] * for_studies_sd) / for_studies_means)
+max_mean_ratio = ((max_effect[3] * for_studies_sd) / for_studies_means).describe()['mean'] * -100
+min_mean_ratio = ((min_effect[3] * for_studies_sd) / for_studies_means).describe()['mean'] * -100
 
-min_mean_ratio = (biostudy_df.loc[biostudy_df['taxon']=='p', 'min_mean_ratio']*-100).describe()['mean']
-max_mean_ratio = (biostudy_df.loc[biostudy_df['taxon']=='p', 'max_mean_ratio']*-100).describe()['mean']
 results['H3_bioeffect'] = '{0:0.0f} to {1:0.0f}%'.format(min_mean_ratio, max_mean_ratio)
 
 
