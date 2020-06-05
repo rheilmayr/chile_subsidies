@@ -1,3 +1,15 @@
+/*
+Project: "Impacts of Chilean forest subsidies on forest cover, carbon and biodiversity" 
+
+Authors: Robert Heilmayr, Cristian Echeverria and Eric Lambin
+
+Purpose: Runs estimation of econometric model of land use change. Generates
+	model parameters that are used in simulation.py.
+
+Inputs: Input data can be downloaded from: https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/6RDDQH 
+*/
+
+
 /// Set-up
 clear
 clear matrix
@@ -5,7 +17,7 @@ set more off
 
 
 /// Read data
-loc dir D:\cloud\dropbox\documents\research\chile\landUseModel\paper_release_v5\
+loc dir D:\ // Set to path where you have saved estimation.csv
 insheet using `dir'estimation.csv
 
 
