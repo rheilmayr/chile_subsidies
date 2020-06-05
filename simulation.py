@@ -1,8 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 22 16:30:50 2018
+Project: "Impacts of Chilean forest subsidies on forest cover, carbon and biodiversity" 
 
-@author: rheil
+Authors: Robert Heilmayr, Cristian Echeverria and Eric Lambin
+
+Purpose: Runs Monte Carlo simulation of land use and creates summary tables
+    of land use, carbon and biodiversity. Reproduces all tables and quantiative
+    results for paper.
+
+Inputs: Input data can be downloaded from: https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/6RDDQH 
+    Prior to running this script, estimations script (estimation.do) needs to be run in Stata.
+
+Note: Full simulation with 1000 iterations can be slow to run (>24 hours).
+    
 """
 
 # =============================================================================
@@ -12,14 +22,14 @@ import pandas as pd
 import numpy as np
 import statsmodels.stats.api as sms
 from sklearn import metrics
-import random
-random.seed(123)
+np.random.seed(805)
+import os
 
 # =============================================================================
 # Set parameters
 # =============================================================================
 n = 1000
-data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/1-15-20/'
+data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/paper_release_v3_confirm/'
 out_dir = data_dir + 'sim/'
 results_dir = data_dir + 'results/'
 
@@ -31,12 +41,20 @@ data_df = pd.read_csv(data_csv, index_col = 0)
 coefs_csv = data_dir + 'coefs.txt' # Created by stata estimation.do
 cov_csv = data_dir + 'cov.txt' # Created by stata estimation.do
 
-coefs_dict = {'p2001': data_dir + 'coefs_2001.txt',
-              'p2011': data_dir + 'coefs_2011.txt',
-              'pooled': data_dir + 'coefs.txt'}
-cov_dict = {'p2001': data_dir + 'cov_2001.txt',
-            'p2011': data_dir + 'cov_2011.txt',
-            'pooled': data_dir + 'cov.txt'}
+co2_csv = data_dir + 'co2_metrics.csv'
+bio_csv = data_dir + 'biodiversity_metrics.csv'
+biostudy_csv = 'D:/cloud/dropbox/documents/research/chile/landUseModel/results/bio_studies.csv'
+
+
+# =============================================================================
+# Make output directories
+# =============================================================================
+if not os.path.exists(out_dir):
+    os.mkdir(out_dir)
+if not os.path.exists(results_dir):
+    os.mkdir(results_dir)
+
+
 # =============================================================================
 # Define functions
 # =============================================================================
@@ -297,16 +315,18 @@ sim_dict = {'sub': sim_sub,
             'ns': sim_ns,
             'rs': sim_rs}
 
+
 # =============================================================================
-# Run single simulation for figure 1
+# Summarize probabilty of plantation conversion for Figure 1
 # =============================================================================
 plant_prob = (sim_sub==3).mean(axis = 1)
 plant_prob.name = 'sub_sim'
 fig_df = data_df.merge(plant_prob, left_index = True, right_index = True, how = 'left')
 fig_df.to_csv(out_dir + 'fig_data.csv')
 
+
 # =============================================================================
-# Transition table (Table 2)
+# Transition table (Table 3)
 # =============================================================================
 def calc_transitions(sim_df):
     sim_df = sim_df.rename(columns = lambda x: int(x))
@@ -336,7 +356,7 @@ transition_df = pd.concat(tab_dict, axis = 1).sort_index()
 
 rows = transition_df.index
 columns = transition_df.columns.get_level_values(0).unique()
-t2_df = pd.DataFrame(index = rows, columns = columns)
+t3_df = pd.DataFrame(index = rows, columns = columns)
 
 for row in rows:
     for column in columns:
@@ -347,7 +367,7 @@ for row in rows:
         ci = '{0:,.2f}'.format(ci)
         mean = '{0:,.2f}'.format(mean)
         string = str(mean) + ' +/- ' + str(ci)
-        t2_df.loc[row, column] = string
+        t3_df.loc[row, column] = string
 
 lu_labels = {1: 'Native forest', 3: 'Plantation', 5: 'Shrub', 19: 'Agriculture', 'bio': 'Biodiversity', 
              'co2': '\makecell{Carbon \\\ sequestration}'} 
@@ -362,21 +382,24 @@ column_labels = {'sub': '\makecell{D.L. 701 \\\ baseline \\\ (S1)}',
                  'rs-lu_86': '\makecell{Perfect enforcement \\\ counterfactual \\\ (S3)}'}
 
 
-t2_df = t2_df[['sub', 'ns', 'rs', 'sub-ns', 'rs-ns']]
+t3_df = t3_df[['sub', 'ns', 'rs', 'sub-ns', 'rs-ns']]
 chng_lbl = 'Transitions between 1986 and 2011'
 dif_lbl = 'Difference between simulations'
 clabels = pd.Series([chng_lbl, chng_lbl, chng_lbl, dif_lbl, dif_lbl],
                     index = ['sub', 'ns', 'rs', 'sub-ns', 'rs-ns'])
 clabels.name = ("","")
-t2_df = t2_df.append(clabels)
-t2_df = t2_df.rename(index = lu_labels)
-t2_df = t2_df.rename(columns = column_labels)
-t2_df.index.names = ['Starting land use', 'Final land use']
-t2_df = t2_df.T.set_index('', append=True).T.swaplevel(1, 0, axis = 1)
+t3_df = t3_df.append(clabels)
+t3_df = t3_df.rename(index = lu_labels)
+t3_df = t3_df.rename(columns = column_labels)
+t3_df.index.names = ['Starting land use', 'Final land use']
+t3_df = t3_df.T.set_index('', append=True).T.swaplevel(1, 0, axis = 1)
 
-t2_df.to_latex(buf = results_dir + 't2_transitions.tex', multirow = True,
+t3_df.to_latex(buf = results_dir + 't3_transitions.tex', multirow = True,
                column_format = "llccccc", escape = False,
                multicolumn = True, multicolumn_format = 'c')
+
+t3_df.to_csv(results_dir + 't3_transitions.csv')
+
 
 # =============================================================================
 # LU impacts
@@ -436,7 +459,6 @@ class estimate_bio:
         bio_df = areas.apply(self.column_calc)
         return bio_df
 
-bio_csv = results_dir + 'bio_results.csv'
 bio_estimator = estimate_bio(bio_csv, n)
 bio_dict = {key: bio_estimator(sim_df).dropna() for key, sim_df in sim_dict.items()}
 
@@ -447,15 +469,15 @@ bio_stats = {key: pd.Series(sim_stats(df)) for key, df in bio_dict.items()}
 bio_df = pd.DataFrame(pd.concat(bio_stats, axis = 0)).T.rename(index = {0: 'bio'})
 
 # =============================================================================
-# Recreate carbon impacts table with error bars
+# Create carbon impacts table
 # =============================================================================
 class estimate_co2:
-    def __init__(self, co2_csv = 'D:/cloud/dropbox/documents/research/chile/landUseModel/carbon/co2_results.csv'):
+    def __init__(self, co2_csv):
         co2_df = pd.read_csv(co2_csv)
-        co2_df = co2_df.drop(['Unnamed: 0', 'plant_01'], 1).set_index('region')
-        co2_df = co2_df[['prad', 'mat', 'plant_11', 'bn']]
+        co2_df = co2_df.set_index('region')
+#        co2_df = co2_df[['prad', 'mat', 'plant', 'bn']]
         co2_df = co2_df.rename(columns = {'bn': 1, 'mat': 5,
-                                          'plant_11': 3, 'prad': 19})
+                                          'plant': 3, 'prad': 19})
         co2_df.index.name = 'region'
         co2_df.columns.name = 'lu_to'
         co2_df = co2_df.sort_index(axis = 1)
@@ -474,11 +496,9 @@ class estimate_co2:
         region_df = pd.DataFrame({i: groups[i].value_counts() for i in runs}) * area_wght
         region_df.index.names = ['region', 'lu_to']
         co2_sim = region_df.apply(lambda x: x.mul(self.co2_df).sum(), axis = 0)
-#        co2_sim = co2_sim / 1000 # Convert to million tonnes C
-#        keep as thousand tonnes C - GgC
-        return co2_sim
+        return co2_sim # Thousand tonnes C
 
-estimator = estimate_co2()
+estimator = estimate_co2(co2_csv)
 co2_dict = {key: estimator(sim_df) for key, sim_df in sim_dict.items()}
 
 for a, b in comparisons:
@@ -488,14 +508,14 @@ co2_stats = {key: pd.Series(sim_stats(df)) for key, df in co2_dict.items()}
 co2_df = pd.DataFrame(pd.concat(co2_stats, axis = 0)).T.rename(index = {0: 'co2'})
 
 # =============================================================================
-# Combine area, biodiversity and co2 data into single table (Table 1)
+# Combine area, biodiversity and co2 data into single table (Table 2)
 # =============================================================================
 results_df = pd.concat([areas_df, co2_df, bio_df])
 
 rows = results_df.index
 columns = results_df.columns.get_level_values(0).unique()
 
-t1_df = pd.DataFrame(index = rows, 
+t2_df = pd.DataFrame(index = rows, 
                         columns = columns)
 
 for row in rows:
@@ -504,10 +524,8 @@ for row in rows:
         mean = results_df.loc[row, (column, 'mean')]
         ci = '{0:,.2f}'.format(ci)
         mean = '{0:,.2f}'.format(mean)
-#        ci = '%s' % float('%.4g' % ci)
-#        mean = '%s' % float('%.4g' % mean)
         string = str(mean) + ' +/- ' + str(ci)
-        t1_df.loc[row, column] = string
+        t2_df.loc[row, column] = string
 
 row = 'bio'
 for column in columns:
@@ -516,36 +534,33 @@ for column in columns:
     ci = '{:.3g}'.format(ci)
     mean = '{:.3g}'.format(mean)
     string = str(mean) + ' +/- ' + str(ci)
-    t1_df.loc[row, column] = string
+    t2_df.loc[row, column] = string
 
 
-t1_df = t1_df[['sub-lu_86', 'ns-lu_86', 'rs-lu_86', 'sub-ns', 'rs-ns']]
-t1_df = t1_df.rename(index = lu_labels)
-t1_df = t1_df.rename(columns = column_labels)
+t2_df = t2_df[['sub-lu_86', 'ns-lu_86', 'rs-lu_86', 'sub-ns', 'rs-ns']]
+t2_df = t2_df.rename(index = lu_labels)
+t2_df = t2_df.rename(columns = column_labels)
 chng_lbl = 'Change between 1986 and 2011'
 dif_lbl = 'Difference between simulations'
-t1_df.loc[''] = [chng_lbl, chng_lbl, chng_lbl, dif_lbl, dif_lbl]
-t1_df = t1_df.T.set_index('', append=True).T.swaplevel(1, 0, axis = 1)
+t2_df.loc[''] = [chng_lbl, chng_lbl, chng_lbl, dif_lbl, dif_lbl]
+t2_df = t2_df.T.set_index('', append=True).T.swaplevel(1, 0, axis = 1)
 units = ['\makecell{Thousand \\\ hectares}', 
          '\makecell{Thousand \\\ hectares}',
          '\makecell{Thousand \\\ hectares}',
          '\makecell{Thousand \\\ hectares}', 
          'Kilotonnes of carbon',
          '\makecell{Area-weighted, standardized \\\ species richness}']
-t1_df['Units'] = units
-t1_df = t1_df.set_index('Units', append=True)
-t1_df.to_latex(buf = results_dir + 't1_summary.tex', multirow = True, 
+t2_df['Units'] = units
+t2_df = t2_df.set_index('Units', append=True)
+t2_df.to_latex(buf = results_dir + 't2_summary.tex', multirow = True, 
                multicolumn = True, multicolumn_format = 'c', escape = False,
                column_format = "lcccccc")
 
+t2_df.to_csv(results_dir + 't2_summary.csv')
 
 # =============================================================================
 # Summary table of regressors (Table S1)
 # =============================================================================
-#alldata_df = pd.read_csv(data_csv, index_col = 0)
-
-#sum_df_b = alldata_df[[ 'for_ev']].describe().T
-#data_df['north'] = ((data_df['south']!=1) & (data_df['central']!=1)).astype(int)
 agsum_df = data_df['ag_ev01'].append( data_df['ag_ev11']).describe()
 plantsum_df = data_df['plant_ev01'].append( data_df['plant_ev11']).describe()
 sum_df = data_df[['for_ev', 'north', 'central', 'south', 'luq1', 'luq2', 'luq3']].describe()
@@ -569,7 +584,7 @@ sum_df.columns = col_labels
 sum_df.to_csv(results_dir + 's1_sumstats.csv', header = True)
 
 # =============================================================================
-# Validation (Table S5)
+# Validation (Table S4)
 # =============================================================================
 val_df = data_df.loc[data_df['oos']==1]
 val_simulator = Simulator()
@@ -596,7 +611,7 @@ for i in [1, 3, 5, 19]:
        
 validation_df['dif'] = (validation_df['pct_correct'] - validation_df['transition_prob']) / validation_df['transition_prob']
 validation_df = validation_df.sort_index()      
-validation_df.to_csv(results_dir + 'validation.csv', header = True)
+validation_df.to_csv(results_dir + 's4_validation.csv', header = True)
 
 val_df = val_df.rename(columns = {'lu_11': 'elu', 'lu_86': 'olu', 'sub': 'sim'})
 kappa, kappa_sim, kappa_transition, kappa_translocation = \
@@ -607,7 +622,7 @@ for i in [1, 3, 5, 19]:
     validation_df.loc[(i, j), 'pct_correct'] = simulated.loc[(i, j, j)] / simulated[(i, j)].sum()
 
 #==============================================================================
-# Regression results with linear combinations (S3)
+# Regression results with linear combinations (T1)
 #==============================================================================
 def clean_regression(esttab_csv):    
     reg_df = pd.read_csv(esttab_csv, 
@@ -640,15 +655,15 @@ def clean_regression(esttab_csv):
 
 esttab_csv = data_dir + 'results_pool.csv'
 reg_df = clean_regression(esttab_csv)
-reg_df.to_csv(results_dir + 's3_estimation.csv', header = True)
+reg_df.to_csv(results_dir + 't1_estimation.csv', header = True)
 
 # =============================================================================
-# Robustness tables (S2)
+# Robustness tables (S3)
 # =============================================================================
 ## drop multiple observations from same property
 esttab_csv = data_dir + 'results_propsample.csv'
 reg_df = clean_regression(esttab_csv)
-reg_df.to_csv(results_dir + 's4_robustness.csv', header = True)
+reg_df.to_csv(results_dir + 's3_robustness.csv', header = True)
 
 #==============================================================================
 # Paper results
@@ -779,7 +794,6 @@ results['G4_rs_scc'] = '{0:0.2f}'.format(rs_scc)
 #of vascular plants, these differences indicate plantations have a mean species 
 #richness that is H3 percent lower than comparable native forests.
 bio_df = bio_estimator.esize_df
-biostudy_df = pd.read_csv('D:/cloud/dropbox/documents/research/chile/landUseModel/results/bio_studies.csv')
 mean = bio_df.loc[(3,5,19), 'mean']
 ci = bio_df.loc[(3,5,19), 'ci_lower']
 ci = mean-ci
@@ -789,6 +803,8 @@ results['H1_biodif_plant'] = '{0:0.3f} +/- {1:0.3f}'.format(-mean[3], ci[3])
 
 max_effect = mean-ci
 min_effect = mean+ci
+
+biostudy_df = pd.read_csv(biostudy_csv)
 biostudy_df['max_mean_ratio'] = (max_effect[3] * biostudy_df['sd_b']) / biostudy_df['mean_b']
 biostudy_df['min_mean_ratio'] = (min_effect[3] * biostudy_df['sd_b']) / biostudy_df['mean_b']
 
