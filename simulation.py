@@ -29,7 +29,7 @@ import os
 # Set parameters
 # =============================================================================
 n = 1000
-data_dir = 'D:/cloud/dropbox/documents/research/chile/landUseModel/paper_release_v6/'
+data_dir = '' # Set to directory where estimation.do was run and simulation.csv file is stored
 out_dir = data_dir + 'sim/'
 results_dir = data_dir + 'results/'
 
