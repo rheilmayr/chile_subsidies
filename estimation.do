@@ -1,10 +1,15 @@
+/// Set-up
 clear
 clear matrix
-loc dir D:\cloud\dropbox\documents\research\chile\landUseModel\1-15-20\
-insheet using `dir'estimation.csv
 set more off
-sum ag_ev plant_ev for_ev
 
+
+/// Read data
+loc dir D:\cloud\dropbox\documents\research\chile\landUseModel\paper_release_v5\
+insheet using `dir'estimation.csv
+
+
+/// Create variables and interactions for regressions
 tabulate luoption, gen(luo)
 tabulate region, gen(region)
 
@@ -60,39 +65,28 @@ loc olus 1 3 5 19
 loc reg_vars
 foreach olu in `olus'{
 	foreach variable in `vars'{
-//    		gen olu`olu'_`variable' = olu`olu' * `variable'
+   		gen olu`olu'_`variable' = olu`olu' * `variable'
 		loc reg_vars `reg_vars' olu`olu'_`variable'
 		}
 	}
-// eststo tp_2001: clogit luchoice `reg_vars' ///
-// 	if oos==0 & timeperiod==2001, group(yfid) cluster(comuna)		
-// esttab using `dir'results_2001.csv, se star(* 0.10 ** 0.05 *** 0.01) replace
-// matrix cov = e(V)
-// matrix coefs = e(b)
-// mat2txt, matrix(cov) saving(`dir'cov_2001) replace
-// mat2txt, matrix(coefs) saving(`dir'coefs_2001) replace
-// eststo clear
-//
-// eststo tp_2011: clogit luchoice `reg_vars' ///
-// 	if oos==0 & timeperiod==2011, group(yfid) cluster(comuna)		
-// esttab using `dir'results_2011.csv, se star(* 0.10 ** 0.05 *** 0.01) replace
-// matrix cov = e(V)
-// matrix coefs = e(b)
-// mat2txt, matrix(cov) saving(`dir'cov_2011) replace
-// mat2txt, matrix(coefs) saving(`dir'coefs_2011) replace
-// eststo clear
+
 	
+/// Run primary model specification
 eststo pooled: clogit luchoice `reg_vars' ///
 	if pooled_sample==1 & oos==0, group(yfid) cluster(comuna)	
 esttab using `dir'results_pool.csv, se star(* 0.10 ** 0.05 *** 0.01) replace
 count if e(sample) & luchoice
 
+
+/// Export coefs and covariance matrix
 matrix cov = e(V)
 matrix coefs = e(b)
 mat2txt, matrix(cov) saving(`dir'cov) replace
 mat2txt, matrix(coefs) saving(`dir'coefs) replace
 eststo clear
 
+
+/// Run robustness check with individual observation per property
 eststo prop_sample: clogit luchoice `reg_vars' ///
 	if pooled_sample==1 & oos==0 & prop_keep==1, group(yfid) cluster(comuna)			
 esttab using `dir'results_propsample.csv, se star(* 0.10 ** 0.05 *** 0.01) replace	
