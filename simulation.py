@@ -29,7 +29,7 @@ import os
 # Set parameters
 # =============================================================================
 n = 1000
-data_dir = '' # Set to directory where estimation.do was run and simulation.csv file is stored
+data_dir = '' # Set to directory where 
 out_dir = data_dir + 'sim/'
 results_dir = data_dir + 'results/'
 
